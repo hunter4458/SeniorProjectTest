@@ -1,63 +1,63 @@
-// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
-const fetch = require('node-fetch');
-
 const app = express();
-const port = process.env.PORT || 3000;
+const axios = require('axios');
 
-// Middleware for parsing JSON requests
 app.use(bodyParser.json());
 
-// Serve static files (HTML, CSS, JavaScript, etc.) from a public directory
-app.use(express.static('public'));
+app.post('/generate-uml', async (req, res) => {
+    const userCode = req.body.code;
 
-// Define an endpoint for handling ChatGPT interactions
-app.post('/api/interactWithChatGPT', async (req, res) => {
+    const apiKey = process.env.OPENAI_API_KEY; // Access the GitHub secret as an environment variable
+
+    // Create a data object for the API request
+    const requestData = {
+        model: 'gpt-3.5-turbo',
+        messages: [
+            { role: 'system', content: 'You are a helpful assistant that converts code to PlantUML format.' },
+            { role: 'user', content: userCode },
+        ],
+        max_tokens: 300,
+    };
+    function convertChatGPTResponseToPlantUML(response) {
+        // Parse the response
+        const lines = response.split('\n');
+        let plantUMLCode = '';
+        let isInPlantUMLBlock = false;
+    
+        for (const line of lines) {
+            if (line.startsWith('@startuml')) {
+                isInPlantUMLBlock = true;
+                plantUMLCode += line + '\n';
+            } else if (line.startsWith('@enduml')) {
+                isInPlantUMLBlock = false;
+                plantUMLCode += line + '\n';
+            } else if (isInPlantUMLBlock) {
+                plantUMLCode += line + '\n';
+            }
+        }
+    
+        return plantUMLCode;
+    }
     try {
-        // Extract user messages and other data from the request body
-        const { messages, max_tokens } = req.body;
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', requestData, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`, // Use the GitHub secret via process.env
+                'Content-Type': 'application/json',
+            },
+        });
 
-        // Construct the payload to send to the ChatGPT API (customize as needed)
-        const payload = {
-            messages,
-            max_tokens,
-            // Add any other necessary parameters for your ChatGPT API here
-        };
-
-        // Make a request to your ChatGPT API (replace with the actual API endpoint)
-        const chatGPTResponse = await makeChatGPTRequest(payload);
-
-        // Send the ChatGPT response back to the client
-        res.json({ chatGPTResponse });
+        const chatGPTResponse = response.data.choices[0].message.content;
+        const plantUMLCode = convertChatGPTResponseToPlantUML(chatGPTResponse);
+        res.send(plantUMLCode);
     } catch (error) {
         console.error('Error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).send('Error generating UML');
     }
 });
 
-// Function to make a request to your ChatGPT API
-async function makeChatGPTRequest(payload) {
-    const apiUrl = 'https://api.openai.com/v1/chat/completions'; // Replace with your ChatGPT API endpoint
 
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            // Add any necessary headers (e.g., API key) for your ChatGPT API here
-        },
-        body: JSON.stringify(payload),
-    });
 
-    if (!response.ok) {
-        throw new Error('ChatGPT API request failed');
-    }
-
-    const data = await response.json();
-    return data;
-}
-
-// Start the server
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+app.listen(3000, () => {
+    console.log('Server is running on port 3000');
 });

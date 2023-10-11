@@ -38,32 +38,27 @@
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
-
 </head>
 
 <body>
     <header>
         <h1>UMLify</h1>
     </header>
-
     <main>
         <section class="upload-section">
             <h2>Upload Your Code Here</h2>
             <form id="upload-form" enctype="multipart/form-data">
                 <label for="code-file">Select a File to Upload:</label>
                 <input type="file" id="code-file" name="codeFile" accept=".java, .cpp, .py, .js">
-
                 <label for="diagram-type">Choose UML Diagram Type:</label>
                 <select id="diagram-type" name="diagramType">
                     <option value="class">Class Diagram</option>
                     <option value="sequence">Sequence Diagram</option>
                     <!-- Add more diagram types as needed -->
                 </select>
-
                 <button type="submit" id="generate-button">Generate UML Diagram</button>
             </form>
         </section>
-
         <section class="diagram-section">
             <h2>Generated PlantUML Code:</h2>
             <div id="plantUML-code-container" class="plantUML-code-container">
@@ -75,108 +70,37 @@
             </div>
         </section>
     </main>
-
     <!-- Loading circle container -->
     <div class="loading-circle-container" id="loading-circle">
         <div class="loading-circle"></div>
     </div>
-
     <script>
-        // Define a function to limit API requests
-        let lastRequestTime = 0;
-        const requestCooldown = 2000; // Time in milliseconds (2 seconds)
-
-        async function rateLimitedRequest(requestData) {
-            const currentTime = new Date().getTime();
-            const timeSinceLastRequest = currentTime - lastRequestTime;
-
-            return new Promise((resolve, reject) => {
-                if (timeSinceLastRequest < requestCooldown) {
-                    // Reject the promise if a request was made too recently
-                    reject('Too many requests. Please wait a moment.');
-                } else {
-                    // Update the last request time
-                    lastRequestTime = currentTime;
-
-                    // Fetch data from the serverless function
-                    fetch('/api/interactWithChatGPT', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestData),
-                    })
-                        .then(response => response.json())
-                        .then(data => resolve(data))
-                        .catch(error => reject(error));
-                }
-            });
-        }
-
-
-        async function interactWithChatGPT(userMessage) {
-            // Show loading circle
-            document.getElementById('loading-circle').style.display = 'block';
-
-            // Create a data object
-            const requestData = {
-                messages: [
-                    { role: 'system', content: 'You are a helpful assistant that converts code to PlantUML format.' },
-                    { role: 'user', content: userMessage },
-                ],
-                max_tokens: 300, // Adjust the max_tokens as needed
-            };
-
-            // Make a request to your serverless function
-            fetch('/api/interactWithChatGPT', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestData),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    // Hide loading circle
-                    document.getElementById('loading-circle').style.display = 'none';
-
-                    // Process and display data
-                    const plantUMLCode = convertChatGPTResponseToPlantUML(data.chatGPTResponse);
-                    displayPlantUMLCode(plantUMLCode);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('loading-circle').style.display = 'none';
+        // Function to send code to your Node.js server
+        async function sendCodeToServer(code) {
+            try {
+                const response = await fetch('/generate-uml', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code }),
                 });
-        }
 
-
-        // Function to convert ChatGPT response to PlantUML format (customize this part)
-        function convertChatGPTResponseToPlantUML(response) {
-            // Parse the response
-            const lines = response.split('\n');
-            let plantUMLCode = '';
-            let isInPlantUMLBlock = false;
-
-            for (const line of lines) {
-                if (line.startsWith('@startuml')) {
-                    isInPlantUMLBlock = true;
-                    plantUMLCode += line + '\n';
-                } else if (line.startsWith('@enduml')) {
-                    isInPlantUMLBlock = false;
-                    plantUMLCode += line + '\n';
-                } else if (isInPlantUMLBlock) {
-                    plantUMLCode += line + '\n';
+                if (response.ok) {
+                    const plantUMLCode = await response.text();
+                    displayPlantUMLCode(plantUMLCode); // Display the PlantUML code or diagram on your HTML page
+                } else {
+                    console.error('Error:', response.statusText);
                 }
+            } catch (error) {
+                console.error('Error:', error);
             }
-
-            return plantUMLCode;
         }
-
-        // Function to display the PlantUML code and render the PlantUML diagram
-        // Function to display the PlantUML code and render the PlantUML diagram
-        // Function to display the PlantUML code and render the PlantUML diagram
 
         // Function to display the PlantUML code and render the PlantUML diagram
         function displayPlantUMLCode(plantUMLCode) {
             // Log and verify this PlantUML code manually
-            console.log('Original PlantUML Code: \n', plantUMLCode);
+            console.log('Original PlantUML Code:\n', plantUMLCode);
 
             // Encode the PlantUML code in HEX format
             const hexEncodedPlantUMLCode = encodePlantUMLInHex(plantUMLCode);
@@ -196,8 +120,6 @@
         }
 
         // Function to encode PlantUML text in HEX format
-        // Function to encode PlantUML text in HEX format
-        // Function to encode PlantUML text in HEX format with correct line endings
         function encodePlantUMLInHex(plantUMLCode) {
             // Convert each character to HEX and include correct line endings (0D0A)
             let hex = '';
@@ -208,8 +130,7 @@
             return hex;
         }
 
-
-        // Update the event listener to use ChatGPT
+        // Update the event listener to send code to the server
         document.getElementById('upload-form').addEventListener('submit', function (event) {
             event.preventDefault(); // Prevent the form submission
 
@@ -223,8 +144,8 @@
                 reader.onload = function (event) {
                     const codeContent = event.target.result;
 
-                    // Send the code content to ChatGPT for conversion
-                    interactWithChatGPT(codeContent);
+                    // Send the code content to the server for processing
+                    sendCodeToServer(codeContent);
                 };
                 reader.onerror = function (event) {
                     // Handle file read errors here
@@ -237,8 +158,6 @@
                 reader.readAsText(selectedFile);
             }
         });
-
-
     </script>
 </body>
 
