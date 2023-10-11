@@ -1,58 +1,63 @@
+// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-// Middleware to parse JSON requests
+// Middleware for parsing JSON requests
 app.use(bodyParser.json());
 
-// Define your OpenAI API key here or load it from environment variables
-const openaiApiKey = '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';
+// Serve static files (HTML, CSS, JavaScript, etc.) from a public directory
+app.use(express.static('public'));
 
-// Handle the /generate-uml endpoint
-app.post('/generate-uml', async (req, res) => {
-    const userCode = req.body.code;
-
-    // Create the API request to OpenAI using the stored API key
-    const requestData = {
-        model: 'gpt-3.5-turbo',
-        messages: [
-            { role: 'system', content: 'You are a helpful assistant that converts code to PlantUML format.' },
-            { role: 'user', content: userCode },
-        ],
-        max_tokens: 300, // You can adjust this as needed
-    };
-
+// Define an endpoint for handling ChatGPT interactions
+app.post('/api/interactWithChatGPT', async (req, res) => {
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${OPEN_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestData),
-        });
+        // Extract user messages and other data from the request body
+        const { messages, max_tokens } = req.body;
 
-        if (response.ok) {
-            const data = await response.json();
-            const chatGPTResponse = data.choices[0].message.content;
+        // Construct the payload to send to the ChatGPT API (customize as needed)
+        const payload = {
+            messages,
+            max_tokens,
+            // Add any other necessary parameters for your ChatGPT API here
+        };
 
-            // Further processing to convert chatGPTResponse to PlantUML format
+        // Make a request to your ChatGPT API (replace with the actual API endpoint)
+        const chatGPTResponse = await makeChatGPTRequest(payload);
 
-            // Send the PlantUML result back to the client
-            res.send(plantUMLCode);
-        } else {
-            console.error('OpenAI API Error:', response.statusText);
-            res.status(500).send('Error');
-        }
+        // Send the ChatGPT response back to the client
+        res.json({ chatGPTResponse });
     } catch (error) {
         console.error('Error:', error);
-        res.status(500).send('Error');
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
+// Function to make a request to your ChatGPT API
+async function makeChatGPTRequest(payload) {
+    const apiUrl = 'https://api.openai.com/v1/chat/completions'; // Replace with your ChatGPT API endpoint
+
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // Add any necessary headers (e.g., API key) for your ChatGPT API here
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        throw new Error('ChatGPT API request failed');
+    }
+
+    const data = await response.json();
+    return data;
+}
+
+// Start the server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });

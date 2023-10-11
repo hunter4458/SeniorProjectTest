@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,27 +11,36 @@
         .loading-circle-container {
             width: 100%;
             text-align: center;
-            display: none; /* Initially hidden */
+            display: none;
+            /* Initially hidden */
         }
 
         .loading-circle {
             width: 100px;
             height: 100px;
             border: 8px solid rgba(0, 0, 0, 0.1);
-            border-top: 8px solid red; /* Change the color as desired */
+            border-top: 8px solid red;
+            /* Change the color as desired */
             border-radius: 50%;
             animation: spin 2s linear infinite;
-            margin: 20px auto; /* Center the loading circle */
+            margin: 20px auto;
+            /* Center the loading circle */
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
 
 </head>
+
 <body>
     <header>
         <h1>UMLify</h1>
@@ -73,26 +83,69 @@
 
     <script>
         // Define a function to limit API requests
-     async function sendCodeToServer(code) {
-            try {
-                const response = await fetch('/generate-uml', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ code }),
-                });
+        let lastRequestTime = 0;
+        const requestCooldown = 2000; // Time in milliseconds (2 seconds)
 
-                if (response.ok) {
-                    const plantUMLCode = await response.text();
-                    // Display the PlantUML code or diagram on your HTML page
+        async function rateLimitedRequest(requestData) {
+            const currentTime = new Date().getTime();
+            const timeSinceLastRequest = currentTime - lastRequestTime;
+
+            return new Promise((resolve, reject) => {
+                if (timeSinceLastRequest < requestCooldown) {
+                    // Reject the promise if a request was made too recently
+                    reject('Too many requests. Please wait a moment.');
                 } else {
-                    console.error('Error:', response.statusText);
+                    // Update the last request time
+                    lastRequestTime = currentTime;
+
+                    // Fetch data from the serverless function
+                    fetch('/api/interactWithChatGPT', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestData),
+                    })
+                        .then(response => response.json())
+                        .then(data => resolve(data))
+                        .catch(error => reject(error));
                 }
-            } catch (error) {
-                console.error('Error:', error);
-            }
+            });
         }
+
+
+        async function interactWithChatGPT(userMessage) {
+            // Show loading circle
+            document.getElementById('loading-circle').style.display = 'block';
+
+            // Create a data object
+            const requestData = {
+                messages: [
+                    { role: 'system', content: 'You are a helpful assistant that converts code to PlantUML format.' },
+                    { role: 'user', content: userMessage },
+                ],
+                max_tokens: 300, // Adjust the max_tokens as needed
+            };
+
+            // Make a request to your serverless function
+            fetch('/api/interactWithChatGPT', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loading circle
+                    document.getElementById('loading-circle').style.display = 'none';
+
+                    // Process and display data
+                    const plantUMLCode = convertChatGPTResponseToPlantUML(data.chatGPTResponse);
+                    displayPlantUMLCode(plantUMLCode);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading-circle').style.display = 'none';
+                });
+        }
+
 
         // Function to convert ChatGPT response to PlantUML format (customize this part)
         function convertChatGPTResponseToPlantUML(response) {
@@ -118,43 +171,43 @@
 
         // Function to display the PlantUML code and render the PlantUML diagram
         // Function to display the PlantUML code and render the PlantUML diagram
-// Function to display the PlantUML code and render the PlantUML diagram
- 
-// Function to display the PlantUML code and render the PlantUML diagram
-function displayPlantUMLCode(plantUMLCode) {
-    // Log and verify this PlantUML code manually
-    console.log('Original PlantUML Code: \n', plantUMLCode);
+        // Function to display the PlantUML code and render the PlantUML diagram
 
-    // Encode the PlantUML code in HEX format
-    const hexEncodedPlantUMLCode = encodePlantUMLInHex(plantUMLCode);
+        // Function to display the PlantUML code and render the PlantUML diagram
+        function displayPlantUMLCode(plantUMLCode) {
+            // Log and verify this PlantUML code manually
+            console.log('Original PlantUML Code: \n', plantUMLCode);
 
-    // Construct the URL with HEX-encoded data
-    const imageUrl = `https://www.plantuml.com/plantuml/png/~h${hexEncodedPlantUMLCode}`;
+            // Encode the PlantUML code in HEX format
+            const hexEncodedPlantUMLCode = encodePlantUMLInHex(plantUMLCode);
 
-    // Log and manually access this URL to verify
-    console.log('Image URL:', imageUrl);
+            // Construct the URL with HEX-encoded data
+            const imageUrl = `https://www.plantuml.com/plantuml/png/~h${hexEncodedPlantUMLCode}`;
 
-    // Set the image source
-    const plantUMLDiagramContainer = document.getElementById('plantUML-diagram-container');
-    plantUMLDiagramContainer.innerHTML = '';
-    const img = document.createElement('img');
-    img.src = imageUrl;
-    plantUMLDiagramContainer.appendChild(img);
-}
+            // Log and manually access this URL to verify
+            console.log('Image URL:', imageUrl);
 
-// Function to encode PlantUML text in HEX format
-// Function to encode PlantUML text in HEX format
-// Function to encode PlantUML text in HEX format with correct line endings
-function encodePlantUMLInHex(plantUMLCode) {
-    // Convert each character to HEX and include correct line endings (0D0A)
-   let hex = '';
-    for (let i = 0; i < plantUMLCode.length; i++) {
-        const charCode = plantUMLCode.charCodeAt(i).toString(16).toUpperCase();
-        hex += charCode.length < 2 ? '0' + charCode : charCode; // Ensure two characters for each code
-    }
-    return hex;
-}
- 
+            // Set the image source
+            const plantUMLDiagramContainer = document.getElementById('plantUML-diagram-container');
+            plantUMLDiagramContainer.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            plantUMLDiagramContainer.appendChild(img);
+        }
+
+        // Function to encode PlantUML text in HEX format
+        // Function to encode PlantUML text in HEX format
+        // Function to encode PlantUML text in HEX format with correct line endings
+        function encodePlantUMLInHex(plantUMLCode) {
+            // Convert each character to HEX and include correct line endings (0D0A)
+            let hex = '';
+            for (let i = 0; i < plantUMLCode.length; i++) {
+                const charCode = plantUMLCode.charCodeAt(i).toString(16).toUpperCase();
+                hex += charCode.length < 2 ? '0' + charCode : charCode; // Ensure two characters for each code
+            }
+            return hex;
+        }
+
 
         // Update the event listener to use ChatGPT
         document.getElementById('upload-form').addEventListener('submit', function (event) {
@@ -184,8 +237,9 @@ function encodePlantUMLInHex(plantUMLCode) {
                 reader.readAsText(selectedFile);
             }
         });
-		
+
 
     </script>
 </body>
+
 </html>
